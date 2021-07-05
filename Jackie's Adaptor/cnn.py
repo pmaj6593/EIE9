@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-REBUILD_DATA = False # set to true to one once, then back to false unless you want to change something in your training data.
+REBUILD_DATA = True # set to true to one once, then back to false unless you want to change something in your training data.
 
 class DogsVSCats():
     IMG_SIZE = 50
@@ -114,9 +114,9 @@ net.conv2.weight.requires_grad = False
 net.conv2.bias.requires_grad = False
 # # # Ends here
 
-if REBUILD_DATA:
-    dogsvcats = DogsVSCats()
-    dogsvcats.make_training_data()
+#if REBUILD_DATA:
+dogsvcats = DogsVSCats()
+dogsvcats.make_training_data()
 
 training_data = np.load("training_data.npy", allow_pickle=True)
 print(len(training_data))
