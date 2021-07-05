@@ -23,7 +23,7 @@ test_data = datasets.MNIST(
     #target_transform=Lambda(lambda y: torch.zeros(10, dtype=torch.float).scatter_(0, torch.tensor(y), value=1))
 )
 
-batch_size = 64
+batch_size = 10
 
 train_dataloader = DataLoader(training_data, batch_size=batch_size)
 test_dataloader = DataLoader(test_data, batch_size=batch_size)
@@ -71,7 +71,7 @@ model = NeuralNetwork().to(device)
 print(model)
 
 loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr = 5e-3)
+optimizer = torch.optim.SGD(model.parameters(), lr = 0.01)
 
 def train(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
