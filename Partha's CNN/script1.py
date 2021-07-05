@@ -5,6 +5,7 @@ from torchvision import datasets
 from torchvision.transforms import ToTensor, Lambda
 import numpy as np
 import torch.nn.functional as F
+from torch.utils.data.sampler import SubsetRandomSampler
 
 #Download training data
 training_data = datasets.MNIST(
@@ -23,11 +24,30 @@ test_data = datasets.MNIST(
     #target_transform=Lambda(lambda y: torch.zeros(10, dtype=torch.float).scatter_(0, torch.tensor(y), value=1))
 )
 
-batch_size = 10
+batch_size = 64
 
-train_dataloader = DataLoader(training_data, batch_size=batch_size)
-test_dataloader = DataLoader(test_data, batch_size=batch_size)
+def get_indices(dataset,class_name):
+    indices =  []
+    for i in range(len(dataset.targets)):           
+        if dataset.targets[i] in class_name:        #Get the index of all data belonging to the class of interest
+            indices.append(i)
+    return indices
 
+train_labels = [0,1,2,3,4,5,6]
+test_labels = [0,1,2,3,4,5,6]
+idx_train = get_indices(training_data, train_labels)       #change second argument for different classes
+idx_test = get_indices(test_data, test_labels)
+
+train_dataloader = DataLoader(training_data, batch_size=batch_size, sampler = SubsetRandomSampler(idx_train))   #samples from the modified dataset
+test_dataloader = DataLoader(test_data, batch_size=batch_size, sampler = SubsetRandomSampler(idx_test))
+
+print(len(idx_train))
+print(len(idx_test))
+
+# for idx, (data, target) in enumerate(train_dataloader):
+#     print(target)
+
+#print(train_dataloader)
 for X, y in test_dataloader:
     print("Shape of X [N, C, H, W]: ", X.shape)
     print("Shape of y: ", y.shape, y.dtype)
@@ -41,16 +61,12 @@ class NeuralNetwork(nn.Module):
         super(NeuralNetwork, self).__init__()
         self.conv1 = nn.Conv2d(1,6,5)
         self.conv2 = nn.Conv2d(6,16,5)
-        #nn.Flatten(),
-        self.fc1 = nn.Linear(256, 256)
         #nn.ReLU(),
-        self.fc2 = nn.Linear(256, 256)
+        self.fc1 = nn.Linear(256, 128)
         #nn.ReLU(),
-        self.fc3 = nn.Linear(256, 128)
+        self.fc2 = nn.Linear(128, 64)
         #nn.ReLU(),
-        self.fc4 = nn.Linear(128, 64)
-        #nn.ReLU(),
-        self.fc5 = nn.Linear(64 ,10)
+        self.fc3 = nn.Linear(64 ,10)
         
 
     def forward(self, x):
@@ -62,16 +78,14 @@ class NeuralNetwork(nn.Module):
         x = x.view(x.size(0), -1)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
-        x = F.relu(self.fc4(x))
-        x = self.fc5(x)
+        x = self.fc3(x)
         return x
 
 model = NeuralNetwork().to(device)
 print(model)
 
 loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr = 0.01)
+optimizer = torch.optim.SGD(model.parameters(), lr = 0.001)
 
 def train(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
@@ -87,12 +101,13 @@ def train(dataloader, model, loss_fn, optimizer):
         loss.backward()
         optimizer.step()
 
-        if batch%100 == 0:
+        if batch%500 == 0:
             loss, current = loss.item(), batch*len(X)
             print(f"loss: {loss:<7f} [{current:>5d}/{size:>5d}]")
 
-def test(dataloader, model, loss_fn):
+def test(dataloader, model, loss_fn, idx_test):
     size = len(dataloader.dataset)
+    print(size)
     num_batches = len(dataloader)
     model.eval()
     test_loss, correct = 0, 0
@@ -104,15 +119,16 @@ def test(dataloader, model, loss_fn):
             pred = model(X)
             correct += (pred.argmax(1)==y).type(torch.float).sum().item()
     test_loss /= num_batches
-    correct /= size
+    correct /= len(idx_test)
     print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg Loss: {test_loss:>8f} \n")
 
-epochs = 30
+epochs = 20
 for t in range(epochs):
     print(f"Epoch {t+1}\n------------")
     train(train_dataloader, model, loss_fn, optimizer)
-    test(test_dataloader, model, loss_fn)
+    test(test_dataloader, model, loss_fn, idx_test)
 print("Done!")
 
-torch.save(model, "MNIST.pth")
+FILE = "MNIST_sd.pth"
+torch.save(model.state_dict(), FILE)
 print("Saved PyTorch Model State to MNIST.pth")

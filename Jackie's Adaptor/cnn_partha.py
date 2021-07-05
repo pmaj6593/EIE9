@@ -23,7 +23,7 @@ test_data = datasets.MNIST(
     #target_transform=Lambda(lambda y: torch.zeros(10, dtype=torch.float).scatter_(0, torch.tensor(y), value=1))
 )
 
-batch_size = 10
+batch_size = 64
 
 train_dataloader = DataLoader(training_data, batch_size=batch_size)
 test_dataloader = DataLoader(test_data, batch_size=batch_size)
@@ -73,16 +73,8 @@ class NeuralNetwork(nn.Module):
         # If there exists an adaptor, apply it
         if (adaptor != -1):
             x = adaptor(x)
-
-            ## Code for freezing up to the last level ###
-            # Note: The leaf tensors do not have grad_fn, so we cannot set those. Need more reading on that
-            # Freezing the parameters which is 1 less than number of layers, in this case, 5, freeze 4
-            ct = 0
-            for children in self.children():
-                ct += 1
-                if ct < 2:
-                    for param in children.parameters():
-                        param.requires_grad = False
+            for param in self.parameters():
+                param.requires_grad = False
         ### ADAPTOR MODULE ###
 
         x = F.relu(self.fc1(x))
@@ -90,14 +82,20 @@ class NeuralNetwork(nn.Module):
         x = self.fc3(x)
         return x
 
-model = NeuralNetwork().to(device)
+model = NeuralNetwork()
 adaptor = Adaptor()
+# adaptor = -1 
 print(model)
 
 loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr = 0.01)
+optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=0.001)
 
-def train(dataloader, model, loss_fn, optimizer, adaptor):
+if (adaptor != -1):
+    adap_optim = optimizer = torch.optim.SGD(adaptor.parameters(), lr = 0.001)
+else:
+    adap_optim = -1
+
+def train(dataloader, model, loss_fn, optimizer, adaptor, adap_optim):
     size = len(dataloader.dataset)
     for batch, (X,y) in enumerate(dataloader):
         X,y = X.to(device), y.to(device)
@@ -107,9 +105,16 @@ def train(dataloader, model, loss_fn, optimizer, adaptor):
         loss = loss_fn(pred, y)
 
         #Backpropagation
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        if (adaptor != -1):
+            optimizer.zero_grad()
+            adap_optim.zero_grad()
+            loss.backward()
+            optimizer.step()
+            adap_optim.step()
+        else:
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
         if batch%100 == 0:
             loss, current = loss.item(), batch*len(X)
@@ -131,12 +136,18 @@ def test(dataloader, model, loss_fn, adaptor):
     correct /= size
     print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg Loss: {test_loss:>8f} \n")
 
-epochs = 10
+epochs = 5
+
+model.load_state_dict(torch.load("MNIST_sd.pth"))
+
 for t in range(epochs):
     print(f"Epoch {t+1}\n------------")
-    train(train_dataloader, model, loss_fn, optimizer, adaptor)
+    train(train_dataloader, model, loss_fn, optimizer, adaptor, adap_optim)
     test(test_dataloader, model, loss_fn, adaptor)
 print("Done!")
 
-torch.save(model, "MNIST.pth")
-print("Saved PyTorch Model State to MNIST.pth")
+torch.save(model.state_dict(), "ADAPTER.pth")
+# test(test_dataloader, model, loss_fn, adaptor)
+
+# torch.save(model.state_dict(), "MNIST_RETRAIN.pth")
+# print("Saved PyTorch Model State to MNIST.pth")
