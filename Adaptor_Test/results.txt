@@ -1,0 +1,3 @@
+MNIST_sd.pth - Trained over dataset of [0, 7], yielded 65.7%, Avg Loss = 6.85, 30 epochs
+ADAPTER.pth - Loaded MNIST_sd.pth, trained over entire dataset, yielded 84.5% accuracy, Avg Loss = 0.54, 5 epochs
+MNIST_RETRAIN.pt - Loaded MNIST_sd.pth, trained over entire dataset, yielded 90.4% accuracy, Avg Loss = 0.31, 5 epochs
