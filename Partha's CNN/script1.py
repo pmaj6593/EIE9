@@ -86,7 +86,7 @@ model = NeuralNetwork().to(device)
 print(model)
 
 loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr = 5e-3)
+optimizer = torch.optim.SGD(model.parameters(), lr = 0.01)
 
 def train(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
