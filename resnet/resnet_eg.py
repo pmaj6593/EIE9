@@ -2,13 +2,16 @@ import torch
 import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
+from torch.utils.data.sampler import SequentialSampler
+import random
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Hyper-parameters
-num_epochs = 10
-learning_rate = 0.001
+num_epochs = 15
+learning_rate = 0.005
+lr_decay = 3
 
 # Image preprocessing modules
 transform = transforms.Compose([
@@ -27,14 +30,38 @@ test_dataset = torchvision.datasets.CIFAR10(root='../../data/',
                                             train=False, 
                                             transform=transforms.ToTensor())
 
+def get_indices(dataset,class_name):
+    indices =  []
+    for i in range(len(dataset.targets)):           
+        if dataset.targets[i] == class_name:        #Get the index of all data belonging to the class of interest
+            indices.append(i)
+    return indices
+
+def get_portion_of_data(dataset, labels, div):
+    total_indices = []
+    for j in labels:                             #Get all indices for each label of interest
+        indices = get_indices(dataset, j)   
+        indices = indices[0:len(indices)//div]      #Halve the list for that label
+        total_indices+=indices                      #Add the halved list to the main main list of indices
+    return total_indices
+
+label_nums = [0,1,2,3,4,5,6,7,8,9]
+
+idx_train = get_portion_of_data(train_dataset, label_nums, 2)
+
+random.shuffle(idx_train)                           #Shuffle data so we don't have to use a random sampler (otherwise data will contain each label in order)
+
 # Data loader
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                           batch_size=100, 
-                                           shuffle=True)
+                                           batch_size=10, 
+                                           shuffle=False,
+                                           sampler = SequentialSampler(idx_train))
 
 test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
-                                          batch_size=100, 
+                                          batch_size=50, 
                                           shuffle=False)
+
+label_nums = [0,1,2,3,4,5,6,7,8,9]
 
 # 3x3 convolution
 def conv3x3(in_channels, out_channels, stride=1):
@@ -141,7 +168,7 @@ for epoch in range(num_epochs):
 
     # Decay learning rate
     if (epoch+1) % 20 == 0:
-        curr_lr /= 3
+        curr_lr /= lr_decay
         update_lr(optimizer, curr_lr)
 
 # Test the model
