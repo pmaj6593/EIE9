@@ -15,13 +15,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # Hyper-parameters
 num_epochs = 5
 learning_rate = 0.001
-<<<<<<< HEAD
-adaptor_on = -1
-batch_size = 100
-=======
 adaptor_on = 1
 batch_size = 50
->>>>>>> 26f2056211db92a34257e91c6ecee640acbabc3e
 
 # Image preprocessing modules
 transform = transforms.Compose([
@@ -47,24 +42,8 @@ def get_indices(dataset,class_name):
             indices.append(i)
     return indices
 
-<<<<<<< HEAD
-def get_portion_of_data(dataset, labels, div):
-    total_indices = []
-    for j in labels:                             #Get all indices for each label of interest
-        indices = get_indices(dataset, j)   
-        indices = indices[0:len(indices)//div]      #Halve the list for that label
-        total_indices+=indices                      #Add the halved list to the main main list of indices
-    return total_indices
-
-train_labels = [0,1,2,3,4,5,6,7]
-test_labels = [0,1,2,3,4,5,6,7]
-
-idx_train = get_portion_of_data(train_dataset, train_labels, 1)
-idx_test = get_portion_of_data(test_dataset, test_labels, 1)
-=======
 train_labels = [0,1,2,3,4,5,6]
 test_labels = [0,1,2,3,4,5,6]
->>>>>>> 26f2056211db92a34257e91c6ecee640acbabc3e
 
 idx_train = get_indices(train_dataset, train_labels)       #change second argument for different classes
 idx_test = get_indices(test_dataset, test_labels)
