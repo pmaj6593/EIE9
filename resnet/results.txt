@@ -1,0 +1,7 @@
+Baseline Benchmark: Whole network re-training takes 1.1 it/s. No params: 
+
+resnet_adv2.py: 
+- Has 1 original LL adaptor, takes ~6.5 it/s to train over new dataset (6x speed)
+
+resnet_adv3.py: 
+- Has 1 original LL adaptor, one Conv adaptor, takes ~2.9 it/s. (3x speed)
