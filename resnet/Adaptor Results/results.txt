@@ -1,0 +1,3 @@
+Pretrained model: ResNet_pt.pth, trained [0 4] with 85% accuracy (full) and 60.8% for initial with [0 6]
+Adapter: adapt.pth, trained with pre-trained with [0 6], accuracy 71.2% accuracy (5 epochs)
+Training again: Trained with pre-trained with [0 6], accuracy is 80.4% (5 epochs)
