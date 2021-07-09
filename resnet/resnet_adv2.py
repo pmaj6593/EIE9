@@ -5,6 +5,7 @@ import torchvision.transforms as transforms
 import torch.nn.functional as F
 from tqdm import tqdm
 from torch.utils.data import DataLoader
+from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.data.sampler import SequentialSampler
 import random
 
@@ -12,10 +13,10 @@ import random
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Hyper-parameters
-num_epochs = 2
+num_epochs = 5
 learning_rate = 0.001
-adaptor_on = 0
-batch_size = 100
+adaptor_on = 1
+batch_size = 50
 
 # Image preprocessing modules
 transform = transforms.Compose([
@@ -33,41 +34,22 @@ train_dataset = torchvision.datasets.CIFAR10(root='../../data/',
 test_dataset = torchvision.datasets.CIFAR10(root='../../data/',
                                             train=False, 
                                             transform=transforms.ToTensor())
-
+# Data Loader, and Sorting
 def get_indices(dataset,class_name):
-    indices =  []
+    indices = []
     for i in range(len(dataset.targets)):           
-        if dataset.targets[i] == class_name:        #Get the index of all data belonging to the class of interest
+        if dataset.targets[i] in class_name:        #Get the index of all data belonging to the class of interest
             indices.append(i)
     return indices
 
-def get_portion_of_data(dataset, labels, div):
-    total_indices = []
-    for j in labels:                             #Get all indices for each label of interest
-        indices = get_indices(dataset, j)   
-        indices = indices[0:len(indices)//div]      #Halve the list for that label
-        total_indices+=indices                      #Add the halved list to the main main list of indices
-    return total_indices
+train_labels = [0,1,2,3,4,5,6]
+test_labels = [0,1,2,3,4,5,6]
 
-train_labels = [0,1,2,3,4,5,6,7,8,9]
-test_labels = [0,1,2,3,4,5,6,7,8,9]
+idx_train = get_indices(train_dataset, train_labels)       #change second argument for different classes
+idx_test = get_indices(test_dataset, test_labels)
 
-idx_train = get_portion_of_data(train_dataset, train_labels, 2)
-idx_test = get_portion_of_data(test_dataset, test_labels, 2)
-
-random.shuffle(idx_train)                           #Shuffle data so we don't have to use a random sampler (otherwise data will contain each label in order)
-random.shuffle(idx_test)
-
-# Data loader
-train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                           batch_size=100, 
-                                           shuffle=False,
-                                           sampler = SequentialSampler(idx_train))
-
-test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
-                                          batch_size=100, 
-                                          shuffle=False,
-                                          sampler = SequentialSampler(idx_test))
+train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler = SubsetRandomSampler(idx_train))   #samples from the modified dataset
+test_loader = DataLoader(test_dataset, batch_size=batch_size, sampler = SubsetRandomSampler(idx_test))
 
 # 3x3 convolution
 def conv3x3(in_channels, out_channels, stride=1):
@@ -82,7 +64,7 @@ class Adaptor(nn.Module):
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        x = self.fc2(x)
         return x
 
 # Residual block
@@ -160,6 +142,8 @@ class ResNet(nn.Module):
         return out
 
 model = ResNet(ResidualBlock, [2, 2, 2]).to(device)
+# model.load_state_dict(torch.load("ResNet_pt.pth"))
+
 if (adaptor_on == 1):
     adaptor = Adaptor()
     adap_optim = torch.optim.Adam(adaptor.parameters(), lr=learning_rate)
@@ -192,7 +176,7 @@ def train(train_loader, model, criterion, optimizer, adaptor, adap_optim):
             optimizer.step()
             adap_optim.step()
 
-        if (i+1) % 100 == 0:
+        if (i+1) % (len(train_loader)/5) == 0:
             print ("Loss: {:.4f}".format(loss.item()))
 
 # Test the model
@@ -216,6 +200,6 @@ for t in range(num_epochs):
     print(f"Epoch [{t+1}/{num_epochs}]\n------------")
     train(train_loader, model, criterion, optimizer, adaptor, adap_optim)
     test(test_loader, model, criterion, adaptor)
-
+# test(test_loader, model, criterion, adaptor)
 # Save the model checkpoint
-torch.save(model.state_dict(), 'resnet.ckpt')
+# torch.save(model.state_dict(), 'retrain.pth')

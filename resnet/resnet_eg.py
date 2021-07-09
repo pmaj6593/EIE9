@@ -2,13 +2,20 @@ import torch
 import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
+import torch.nn.functional as F
+from tqdm import tqdm
+from torch.utils.data import DataLoader
+from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data.sampler import SequentialSampler
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Hyper-parameters
-num_epochs = 10
-learning_rate = 0.001
+num_epochs = 15
+learning_rate = 0.005
+lr_decay = 3
+batch_size = 50
 
 # Image preprocessing modules
 transform = transforms.Compose([
@@ -27,14 +34,22 @@ test_dataset = torchvision.datasets.CIFAR10(root='../../data/',
                                             train=False, 
                                             transform=transforms.ToTensor())
 
-# Data loader
-train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                           batch_size=100, 
-                                           shuffle=True)
+# Data Loader, and Sorting
+def get_indices(dataset,class_name):
+    indices = []
+    for i in range(len(dataset.targets)):           
+        if dataset.targets[i] in class_name:        #Get the index of all data belonging to the class of interest
+            indices.append(i)
+    return indices
 
-test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
-                                          batch_size=100, 
-                                          shuffle=False)
+train_labels = [0,1,2,3,4,5,6]
+test_labels = [0,1,2,3,4,5,6]
+
+idx_train = get_indices(train_dataset, train_labels)       #change second argument for different classes
+idx_test = get_indices(test_dataset, test_labels)
+
+train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler = SubsetRandomSampler(idx_train))   #samples from the modified dataset
+test_loader = DataLoader(test_dataset, batch_size=batch_size, sampler = SubsetRandomSampler(idx_test))
 
 # 3x3 convolution
 def conv3x3(in_channels, out_channels, stride=1):
@@ -141,7 +156,7 @@ for epoch in range(num_epochs):
 
     # Decay learning rate
     if (epoch+1) % 20 == 0:
-        curr_lr /= 3
+        curr_lr /= lr_decay
         update_lr(optimizer, curr_lr)
 
 # Test the model
