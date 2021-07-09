@@ -14,7 +14,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # Hyper-parameters
 num_epochs = 2
 learning_rate = 0.001
-adaptor_on = 0
+adaptor_on = -1
 batch_size = 100
 
 # Image preprocessing modules
@@ -49,11 +49,11 @@ def get_portion_of_data(dataset, labels, div):
         total_indices+=indices                      #Add the halved list to the main main list of indices
     return total_indices
 
-train_labels = [0,1,2,3,4,5,6,7,8,9]
-test_labels = [0,1,2,3,4,5,6,7,8,9]
+train_labels = [0,1,2,3,4,5,6,7]
+test_labels = [0,1,2,3,4,5,6,7]
 
-idx_train = get_portion_of_data(train_dataset, train_labels, 2)
-idx_test = get_portion_of_data(test_dataset, test_labels, 2)
+idx_train = get_portion_of_data(train_dataset, train_labels, 1)
+idx_test = get_portion_of_data(test_dataset, test_labels, 1)
 
 random.shuffle(idx_train)                           #Shuffle data so we don't have to use a random sampler (otherwise data will contain each label in order)
 random.shuffle(idx_test)
