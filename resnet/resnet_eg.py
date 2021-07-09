@@ -2,8 +2,11 @@ import torch
 import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
+import torch.nn.functional as F
+from tqdm import tqdm
+from torch.utils.data import DataLoader
+from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.data.sampler import SequentialSampler
-import random
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -12,6 +15,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 num_epochs = 15
 learning_rate = 0.005
 lr_decay = 3
+batch_size = 50
 
 # Image preprocessing modules
 transform = transforms.Compose([
@@ -30,38 +34,22 @@ test_dataset = torchvision.datasets.CIFAR10(root='../../data/',
                                             train=False, 
                                             transform=transforms.ToTensor())
 
+# Data Loader, and Sorting
 def get_indices(dataset,class_name):
-    indices =  []
+    indices = []
     for i in range(len(dataset.targets)):           
-        if dataset.targets[i] == class_name:        #Get the index of all data belonging to the class of interest
+        if dataset.targets[i] in class_name:        #Get the index of all data belonging to the class of interest
             indices.append(i)
     return indices
 
-def get_portion_of_data(dataset, labels, div):
-    total_indices = []
-    for j in labels:                             #Get all indices for each label of interest
-        indices = get_indices(dataset, j)   
-        indices = indices[0:len(indices)//div]      #Halve the list for that label
-        total_indices+=indices                      #Add the halved list to the main main list of indices
-    return total_indices
+train_labels = [0,1,2,3,4,5,6]
+test_labels = [0,1,2,3,4,5,6]
 
-label_nums = [0,1,2,3,4,5,6,7,8,9]
+idx_train = get_indices(train_dataset, train_labels)       #change second argument for different classes
+idx_test = get_indices(test_dataset, test_labels)
 
-idx_train = get_portion_of_data(train_dataset, label_nums, 2)
-
-random.shuffle(idx_train)                           #Shuffle data so we don't have to use a random sampler (otherwise data will contain each label in order)
-
-# Data loader
-train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
-                                           batch_size=10, 
-                                           shuffle=False,
-                                           sampler = SequentialSampler(idx_train))
-
-test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
-                                          batch_size=50, 
-                                          shuffle=False)
-
-label_nums = [0,1,2,3,4,5,6,7,8,9]
+train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler = SubsetRandomSampler(idx_train))   #samples from the modified dataset
+test_loader = DataLoader(test_dataset, batch_size=batch_size, sampler = SubsetRandomSampler(idx_test))
 
 # 3x3 convolution
 def conv3x3(in_channels, out_channels, stride=1):

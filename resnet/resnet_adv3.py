@@ -15,13 +15,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # Hyper-parameters
 num_epochs = 5
 learning_rate = 0.001
-<<<<<<< HEAD
-adaptor_on = -1
-batch_size = 100
-=======
 adaptor_on = 1
 batch_size = 50
->>>>>>> 26f2056211db92a34257e91c6ecee640acbabc3e
 
 # Image preprocessing modules
 transform = transforms.Compose([
@@ -47,24 +42,8 @@ def get_indices(dataset,class_name):
             indices.append(i)
     return indices
 
-<<<<<<< HEAD
-def get_portion_of_data(dataset, labels, div):
-    total_indices = []
-    for j in labels:                             #Get all indices for each label of interest
-        indices = get_indices(dataset, j)   
-        indices = indices[0:len(indices)//div]      #Halve the list for that label
-        total_indices+=indices                      #Add the halved list to the main main list of indices
-    return total_indices
-
-train_labels = [0,1,2,3,4,5,6,7]
-test_labels = [0,1,2,3,4,5,6,7]
-
-idx_train = get_portion_of_data(train_dataset, train_labels, 1)
-idx_test = get_portion_of_data(test_dataset, test_labels, 1)
-=======
 train_labels = [0,1,2,3,4,5,6]
 test_labels = [0,1,2,3,4,5,6]
->>>>>>> 26f2056211db92a34257e91c6ecee640acbabc3e
 
 idx_train = get_indices(train_dataset, train_labels)       #change second argument for different classes
 idx_test = get_indices(test_dataset, test_labels)
@@ -86,6 +65,19 @@ class Adaptor(nn.Module):
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
+        return x
+
+class ConvAdaptor(nn.Module):
+    def __init__(self, out_channels):
+        super().__init__() # just run the init of parent class (nn.Module)
+        self.conv1 = conv3x3(out_channels, out_channels, 1)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
         return x
 
 # Residual block
@@ -141,74 +133,96 @@ class ResNet(nn.Module):
             layers.append(block(out_channels, out_channels))
         return nn.Sequential(*layers)
 
-    def forward(self, x, adaptor):
+    def forward(self, x, adaptor, c_adaptor):
+
+        if (adaptor != -1 or c_adaptor != -1):
+            for param in self.parameters():
+                param.requires_grad = False
+
         out = self.conv(x)
         out = self.bn(out)
         out = self.relu(out)
         out = self.layer1(out)
+
+        if (c_adaptor != -1):
+            out = c_adaptor(out)
+
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.avg_pool(out)
         out = out.view(out.size(0), -1)
 
-        ### ADAPTOR MODULE ###
-        # If there exists an adaptor, apply it
         if (adaptor != -1):
             out = adaptor(out)
-            for param in self.parameters():
-                param.requires_grad = False
-        ### ADAPTOR MODULE ###
 
         out = self.fc(out)
         return out
 
 model = ResNet(ResidualBlock, [2, 2, 2]).to(device)
-# model.load_state_dict(torch.load("ResNet_pt.pth"))
+model.load_state_dict(torch.load("ResNet_pt.pth"))
 
 if (adaptor_on == 1):
     adaptor = Adaptor()
     adap_optim = torch.optim.Adam(adaptor.parameters(), lr=learning_rate)
+    c_adaptor = ConvAdaptor(16)
+    c_adap_optim = torch.optim.Adam(c_adaptor.parameters(), lr=learning_rate)
 else:
     adaptor = -1
     adap_optim = -1
+    c_adaptor = -1
+    c_adap_optim = -1
 
 # Loss and optimizer
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-def train(train_loader, model, criterion, optimizer, adaptor, adap_optim):
+def train(train_loader, model, criterion, optimizer, adaptor, adap_optim, c_adaptor, c_adap_optim):
     for i, (images, labels) in enumerate(tqdm(train_loader)):
         images = images.to(device)
         labels = labels.to(device)
 
         # Forward pass
-        outputs = model(images, adaptor)
+        outputs = model(images, adaptor, c_adaptor)
         loss = criterion(outputs, labels)
 
         # Backward and optimize
-        if (adaptor == -1):
+        if (adaptor == -1 and c_adaptor == -1):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        else:
+        elif (adaptor == -1):
+            optimizer.zero_grad()
+            c_adap_optim.zero_grad()
+            loss.backward()
+            optimizer.step()
+            c_adap_optim.step()
+        elif (c_adaptor == -1):
             optimizer.zero_grad()
             adap_optim.zero_grad()
             loss.backward()
             optimizer.step()
             adap_optim.step()
+        else:
+            optimizer.zero_grad()
+            adap_optim.zero_grad()
+            c_adap_optim.zero_grad()
+            loss.backward()
+            optimizer.step()
+            adap_optim.step()
+            c_adap_optim.step()
 
         if (i+1) % (len(train_loader)/5) == 0:
             print ("Loss: {:.4f}".format(loss.item()))
 
 # Test the model
-def test(test_loader, model, criterion, adaptor):
+def test(test_loader, model, criterion, adaptor, c_adaptor):
     with torch.no_grad():
         test_loss, correct = 0, 0
         total = 0
         for images, labels in test_loader:
             images = images.to(device)
             labels = labels.to(device)
-            outputs = model(images, adaptor)
+            outputs = model(images, adaptor, c_adaptor)
             test_loss += criterion(outputs, labels).item()
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
@@ -219,8 +233,9 @@ def test(test_loader, model, criterion, adaptor):
 
 for t in range(num_epochs):
     print(f"Epoch [{t+1}/{num_epochs}]\n------------")
-    train(train_loader, model, criterion, optimizer, adaptor, adap_optim)
-    test(test_loader, model, criterion, adaptor)
-# test(test_loader, model, criterion, adaptor)
+    train(train_loader, model, criterion, optimizer, adaptor, adap_optim, c_adaptor, c_adap_optim)
+    test(test_loader, model, criterion, adaptor, c_adaptor)
+
+# test(test_loader, model, criterion, adaptor, c_adaptor)
 # Save the model checkpoint
 # torch.save(model.state_dict(), 'retrain.pth')
