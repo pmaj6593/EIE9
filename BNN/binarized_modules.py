@@ -21,7 +21,7 @@ class HingeLoss(nn.Module):
         self.margin=1.0
 
     def hinge_loss(self,input,target):
-            #import pdb; pdb.set_trace()
+            import pdb; pdb.set_trace()
             output=self.margin-input.mul(target)
             output[output.le(0)]=0
             return output.mean()
@@ -37,7 +37,7 @@ class SqrtHingeLossFunction(Function):
     def forward(self, input, target):
         output=self.margin-input.mul(target)
         output[output.le(0)]=0
-        self.save_for_backward(input, target)
+        # self.save_for_backward(input, target)
         loss=output.mul(output).sum(0).sum(1).div(target.numel())
         return loss
 

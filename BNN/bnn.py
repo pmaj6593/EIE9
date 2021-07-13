@@ -86,9 +86,9 @@ class ResidualBlock(nn.Module):
         self.conv1 = Binaryconv3x3(inplanes, planes, stride)
         self.bn1 = nn.BatchNorm2d(planes)
         self.tanh1 = nn.Hardtanh(inplace=True)
-        self.conv2 = Binaryconv3x3(planes, planes)
-        self.tanh2 = nn.Hardtanh(inplace=True)
-        self.bn2 = nn.BatchNorm2d(planes)
+        #self.conv2 = Binaryconv3x3(planes, planes)
+        #self.tanh2 = nn.Hardtanh(inplace=True)
+        #self.bn2 = nn.BatchNorm2d(planes)
 
         self.downsample = downsample
         self.do_bntan=do_bntan
@@ -102,18 +102,18 @@ class ResidualBlock(nn.Module):
         out = self.bn1(out)
         out = self.tanh1(out)
 
-        out = self.conv2(out)
+        #out = self.conv2(out)
 
 
         if self.downsample is not None:
-            if residual.data.max()>1:
-                import pdb; pdb.set_trace()
+            # if residual.data.max()>1:
+                # import pdb; pdb.set_trace()
             residual = self.downsample(residual)
 
         out += residual
-        if self.do_bntan:
-            out = self.bn2(out)
-            out = self.tanh2(out)
+        # if self.do_bntan:
+        #     out = self.bn2(out)
+        #     out = self.tanh2(out)
 
         return out
 
@@ -121,7 +121,7 @@ class ResNet(nn.Module):
 
     def __init__(self, block):
         super(ResNet, self).__init__()
-        self.inflate = 5
+        self.inflate = 2
         self.inplanes = 16*self.inflate
         depth = 18
         num_classes = 10
@@ -133,14 +133,14 @@ class ResNet(nn.Module):
         self.tanh1 = nn.Hardtanh(inplace=True)
         self.tanh2 = nn.Hardtanh(inplace=True)
         self.layer1 = self._make_layer(block, 16*self.inflate, n)
-        self.layer2 = self._make_layer(block, 32*self.inflate, n, stride=2)
-        self.layer3 = self._make_layer(block, 64*self.inflate, n, stride=2,do_bntan=False)
+        self.layer2 = self._make_layer(block, 32*self.inflate, n, stride=2, do_bntan = False)
+        # self.layer3 = self._make_layer(block, 64*self.inflate, n, stride=2,do_bntan=False)
         self.layer4 = lambda x: x
         self.avgpool = nn.AvgPool2d(8)
-        self.bn2 = nn.BatchNorm1d(64*self.inflate)
+        self.bn2 = nn.BatchNorm1d(2*64*self.inflate)
         self.bn3 = nn.BatchNorm1d(10)
-        self.logsoftmax = nn.LogSoftmax()
-        self.fc = BinarizeLinear(64*self.inflate, num_classes)
+        self.logsoftmax = nn.LogSoftmax(-1)
+        self.fc = BinarizeLinear(128*self.inflate, num_classes)
 
 #in_channels = planes
 #out_channels = planes * block_expansion
@@ -167,9 +167,9 @@ class ResNet(nn.Module):
         x = self.maxpool(x)
         x = self.bn1(x)
         x = self.tanh1(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
+        x = self.layer1(torch.clone(x))
+        x = self.layer2(torch.clone(x))
+        #x = self.layer3(x)
         x = self.layer4(x)
 
         x = self.avgpool(x)
@@ -226,6 +226,7 @@ for epoch in range(num_epochs):
         labels = labels.to(device)
 
         # Forward pass
+        torch.autograd.set_detect_anomaly(True)
         outputs = model(images)
         loss = criterion(outputs, labels)
 
@@ -239,9 +240,9 @@ for epoch in range(num_epochs):
                    .format(epoch+1, num_epochs, i+1, total_step, loss.item()))
 
     # Decay learning rate
-    if (epoch+1) % 20 == 0:
-        curr_lr /= lr_decay
-        update_lr(optimizer, curr_lr)
+    # if (epoch+1) % 20 == 0:
+    #     curr_lr /= lr_decay
+    #     update_lr(optimizer, curr_lr)
 
 # Test the model
 model.eval()
